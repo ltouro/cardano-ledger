@@ -8,7 +8,7 @@ module Cardano.Ledger.Pretty.Mary where
 
 import Cardano.Ledger.Coin (Coin (..))
 import qualified Cardano.Ledger.Core as Core
-import qualified Cardano.Ledger.Crypto as CC
+import Cardano.Ledger.Era (Era)
 import Cardano.Ledger.Mary.Value
 import Cardano.Ledger.Pretty hiding (ppTxBody)
 import Cardano.Ledger.Shelley.TxBody (ShelleyTxOut)
@@ -36,7 +36,7 @@ instance PrettyA (PolicyID crypto) where prettyA x = ppSexp "PolicyID" [ppPolicy
 
 instance PrettyA AssetName where prettyA x = ppSexp "AssetName" [ppAssetName x]
 
-ppTimelock :: CC.Crypto crypto => Timelock crypto -> PDoc
+ppTimelock :: Era era => Timelock era -> PDoc
 ppTimelock (RequireSignature akh) =
   ppSexp "Signature" [ppKeyHash akh]
 ppTimelock (RequireAllOf ms) =
@@ -50,7 +50,7 @@ ppTimelock (RequireTimeExpire mslot) =
 ppTimelock (RequireTimeStart mslot) =
   ppSexp "Starts" [ppSlotNo mslot]
 
-instance CC.Crypto crypto => PrettyA (Timelock crypto) where prettyA = ppTimelock
+instance Era era => PrettyA (Timelock era) where prettyA = ppTimelock
 
 ppValidityInterval :: ValidityInterval -> PDoc
 ppValidityInterval (ValidityInterval b a) =
@@ -62,7 +62,7 @@ ppValidityInterval (ValidityInterval b a) =
 
 instance PrettyA ValidityInterval where prettyA = ppValidityInterval
 
-ppAuxiliaryData :: PrettyA (Core.Script era) => MAAuxiliaryData era -> PDoc
+ppAuxiliaryData :: Era era => PrettyA (Core.Script era) => MAAuxiliaryData era -> PDoc
 ppAuxiliaryData (AuxiliaryData' m sp) =
   ppRecord
     "AuxiliaryData"
@@ -70,7 +70,7 @@ ppAuxiliaryData (AuxiliaryData' m sp) =
       ("auxiliaryscripts", ppStrictSeq prettyA sp)
     ]
 
-instance PrettyA (Core.Script era) => PrettyA (MAAuxiliaryData era) where
+instance (Era era, PrettyA (Core.Script era)) => PrettyA (MAAuxiliaryData era) where
   prettyA = ppAuxiliaryData
 
 ppTxBody ::
