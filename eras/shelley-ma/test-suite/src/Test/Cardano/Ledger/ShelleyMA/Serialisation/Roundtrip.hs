@@ -16,13 +16,14 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Roundtrip
   ( roundTrip,
     roundTripAnn,
+    roundTripAnnWithTwiddling, roundTripWithTwiddling
   )
 import Data.Typeable (typeRep)
 import Test.Cardano.Ledger.EraBuffet
 import Test.Cardano.Ledger.Shelley.Generator.Metadata ()
 import Test.Cardano.Ledger.Shelley.Serialisation.Generators ()
 import Test.Cardano.Ledger.ShelleyMA.Serialisation.Generators ()
-import Test.QuickCheck (Arbitrary, Property, counterexample, (===))
+import Test.QuickCheck (Arbitrary, Gen, Property, counterexample, (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -35,16 +36,26 @@ propertyAnn ::
   ) =>
   t ->
   Property
-propertyAnn x = case roundTripAnn x of
-  Right (remaining, y) | BSL.null remaining -> x === y
-  Right (remaining, _) ->
+propertyAnn x = handleResult x $ roundTripAnn x
+
+propertyAnnTwiddling :: (Eq t, Show t, ToCBOR t, FromCBOR (Annotator t)) => t -> Gen Property
+propertyAnnTwiddling x = handleResult x <$> roundTripAnnWithTwiddling x
+
+handleResult ::
+  (Eq a1, Show a1, Show a2) =>
+  a1 ->
+  Either a2 (BSL.ByteString, a1) ->
+  Property
+handleResult x (Right (remaining, y))
+  | BSL.null remaining = x === y
+  | otherwise =
     counterexample
       ("Unconsumed trailing bytes:\n" <> BSL.unpack remaining)
       False
-  Left stuff ->
-    counterexample
-      ("Failed to decode: " <> show stuff)
-      False
+handleResult _ (Left stuff) =
+  counterexample
+    ("Failed to decode: " <> show stuff)
+    False
 
 property ::
   forall t.
@@ -55,17 +66,10 @@ property ::
   ) =>
   t ->
   Property
-property x =
-  case roundTrip x of
-    Right (remaining, y) | BSL.null remaining -> x === y
-    Right (remaining, _) ->
-      counterexample
-        ("Unconsumed trailing bytes:\n" <> BSL.unpack remaining)
-        False
-    Left stuff ->
-      counterexample
-        ("Failed to decode: " <> show stuff)
-        False
+property x = handleResult x $ roundTrip x
+
+propertyTwiddling :: (Eq t, Show t, ToCBOR t, FromCBOR t) => t -> Gen Property
+propertyTwiddling x = handleResult x <$> roundTripWithTwiddling x
 
 allprops ::
   forall e.
@@ -88,7 +92,12 @@ allprops =
       testProperty "Metadata" $ propertyAnn @(Core.AuxiliaryData e),
       testProperty "Value" $ property @(Core.Value e),
       testProperty "Script" $ propertyAnn @(Core.Script e),
-      testProperty "ApplyTxError" $ property @(ApplyTxError e)
+      testProperty "ApplyTxError" $ property @(ApplyTxError e),
+      testProperty "TxBody with twiddling" $ propertyAnnTwiddling @(Core.TxBody e),
+      testProperty "Metadata with twiddling" $ propertyAnnTwiddling @(Core.AuxiliaryData e),
+      testProperty "Value with twiddling" $ propertyTwiddling @(Core.Value e),
+      testProperty "Script with twiddling" $ propertyAnnTwiddling @(Core.Script e),
+      testProperty "ApplyTxError with twiddling" $ propertyTwiddling @(ApplyTxError e)
     ]
 
 allEraRoundtripTests :: TestTree

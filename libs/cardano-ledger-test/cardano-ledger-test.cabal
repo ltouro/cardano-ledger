@@ -100,7 +100,6 @@ library
   build-depends:
     aeson >= 2,
     array,
-    binary,
     bytestring,
     cardano-binary,
     cardano-crypto-class,
@@ -114,7 +113,6 @@ library
     cardano-ledger-shelley-ma,
     cardano-protocol-tpraos,
     cardano-slotting,
-    cborg,
     containers,
     vector-map,
     data-default-class,
@@ -124,7 +122,6 @@ library
     groups,
     hkd,
     lens,
-    megaparsec,
     microlens,
     monad-supply,
     mtl,
