@@ -37,7 +37,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Text (Text)
 import qualified Data.Text.Lazy as T
-import Test.QuickCheck (Gen, elements, shuffle)
+import Test.QuickCheck (Gen, elements, shuffle, Property, (===))
 
 -- | Randomly mutates a CBOR AST so that semantics are preserved.
 --
@@ -96,10 +96,13 @@ type RoundTripResult t = Either Codec.CBOR.Read.DeserialiseFailure (Lazy.ByteStr
 roundTrip :: (ToCBOR t, FromCBOR t) => t -> RoundTripResult t
 roundTrip s = deserialiseFromBytes fromCBOR (toLazyByteString (toCBOR s))
 
-roundTripWithTwiddling :: (ToCBOR t, FromCBOR t) => t -> Gen (RoundTripResult t)
+roundTripWithTwiddling :: (ToCBOR t, FromCBOR t, Eq t, Show t) => t -> Gen Property
 roundTripWithTwiddling s = do
   tw <- twiddleEncoding $ toCBOR s
-  pure . deserialiseFromBytes fromCBOR $ toLazyByteString tw
+  let res = case deserialiseFromBytes fromCBOR $ toLazyByteString tw of
+        Left err -> error $ show err
+        Right (_, x) -> x
+  pure $ s === res
 
 roundTrip' :: (t -> Encoding) -> (forall s. Decoder s t) -> t -> RoundTripResult t
 roundTrip' enc dec t = deserialiseFromBytes dec (toLazyByteString (enc t))
@@ -113,16 +116,18 @@ roundTripAnn s =
 
 roundTripAnnWithTwiddling ::
   ( ToCBOR t,
-    FromCBOR (Annotator t)
-  ) =>
+    FromCBOR (Annotator t), Eq t, Show t) =>
   t ->
-  Gen (RoundTripResult t)
+  Gen Property
 roundTripAnnWithTwiddling s = do
   tw <- twiddleEncoding $ toCBOR s
   let bytes = toLazyByteString tw
-  pure $ case deserialiseFromBytes fromCBOR bytes of
-    Left err -> Left err
-    Right (leftover, Annotator f) -> Right (leftover, f (Full bytes))
+  let res = case deserialiseFromBytes fromCBOR bytes of
+        Left err -> error $ show err
+        Right (leftover, Annotator f) 
+          | LBS.null leftover -> f (Full bytes)
+          | otherwise -> error "Leftover bytes after deserialization"
+  pure $ s === res
 
 -- | Can we serialise a type, and then deserialise it as something else?
 embedTrip :: (ToCBOR t, FromCBOR s) => t -> RoundTripResult s

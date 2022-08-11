@@ -23,7 +23,7 @@ import Test.Cardano.Ledger.EraBuffet
 import Test.Cardano.Ledger.Shelley.Generator.Metadata ()
 import Test.Cardano.Ledger.Shelley.Serialisation.Generators ()
 import Test.Cardano.Ledger.ShelleyMA.Serialisation.Generators ()
-import Test.QuickCheck (Arbitrary, Gen, Property, counterexample, (===))
+import Test.QuickCheck (Arbitrary, Property, counterexample, (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -37,9 +37,6 @@ propertyAnn ::
   t ->
   Property
 propertyAnn x = handleResult x $ roundTripAnn x
-
-propertyAnnTwiddling :: (Eq t, Show t, ToCBOR t, FromCBOR (Annotator t)) => t -> Gen Property
-propertyAnnTwiddling x = handleResult x <$> roundTripAnnWithTwiddling x
 
 handleResult ::
   (Eq a1, Show a1, Show a2) =>
@@ -68,9 +65,6 @@ property ::
   Property
 property x = handleResult x $ roundTrip x
 
-propertyTwiddling :: (Eq t, Show t, ToCBOR t, FromCBOR t) => t -> Gen Property
-propertyTwiddling x = handleResult x <$> roundTripWithTwiddling x
-
 allprops ::
   forall e.
   ( ApplyTx e,
@@ -93,11 +87,11 @@ allprops =
       testProperty "Value" $ property @(Core.Value e),
       testProperty "Script" $ propertyAnn @(Core.Script e),
       testProperty "ApplyTxError" $ property @(ApplyTxError e),
-      testProperty "TxBody with twiddling" $ propertyAnnTwiddling @(Core.TxBody e),
-      testProperty "Metadata with twiddling" $ propertyAnnTwiddling @(Core.AuxiliaryData e),
-      testProperty "Value with twiddling" $ propertyTwiddling @(Core.Value e),
-      testProperty "Script with twiddling" $ propertyAnnTwiddling @(Core.Script e),
-      testProperty "ApplyTxError with twiddling" $ propertyTwiddling @(ApplyTxError e)
+      testProperty "TxBody with twiddling" $ roundTripAnnWithTwiddling @(Core.TxBody e),
+      testProperty "Metadata with twiddling" $ roundTripAnnWithTwiddling @(Core.AuxiliaryData e),
+      testProperty "Value with twiddling" $ roundTripWithTwiddling @(Core.Value e),
+      testProperty "Script with twiddling" $ roundTripAnnWithTwiddling @(Core.Script e),
+      testProperty "ApplyTxError with twiddling" $ roundTripWithTwiddling @(ApplyTxError e)
     ]
 
 allEraRoundtripTests :: TestTree
