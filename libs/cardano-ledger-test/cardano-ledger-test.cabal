@@ -49,6 +49,7 @@ library
     Test.Cardano.Ledger.Examples.TwoPhaseValidation
     Test.Cardano.Ledger.Generic.AggPropTests
     Test.Cardano.Ledger.Generic.ApplyTx
+    Test.Cardano.Ledger.Generic.Consensus
     Test.Cardano.Ledger.Generic.Indexed
     Test.Cardano.Ledger.Generic.Fields
     Test.Cardano.Ledger.Generic.Functions

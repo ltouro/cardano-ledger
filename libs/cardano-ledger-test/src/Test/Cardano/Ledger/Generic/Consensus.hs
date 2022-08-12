@@ -10,12 +10,11 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Generic Consensus examples
-module Test.Cardano.Ledger.Generic.ConsensusSave where
+module Test.Cardano.Ledger.Generic.Consensus where
 
 import Cardano.Binary
 import Cardano.Crypto.DSIGN as DSIGN
 import Cardano.Crypto.Hash as Hash
-import Cardano.Crypto.KES.Class (ContextKES)
 import Cardano.Crypto.Seed as Seed
 import Cardano.Crypto.VRF as VRF
 import qualified Cardano.Ledger.Alonzo.PParams as AlonzoPP
@@ -31,8 +30,7 @@ import qualified Cardano.Ledger.Era as Era (Crypto)
 import Cardano.Ledger.Keys
 import Cardano.Ledger.PoolDistr
 import Cardano.Ledger.SafeHash
-import Cardano.Ledger.Shelley (ShelleyEra)
-import Cardano.Ledger.Shelley.API
+import Cardano.Ledger.Shelley.API hiding (RequireMOf,RequireAllOf,RequireAnyOf,RequireSignature)
 import Cardano.Ledger.Shelley.EpochBoundary
 import Cardano.Ledger.Shelley.LedgerState
 import Cardano.Ledger.Shelley.PParams
@@ -40,10 +38,7 @@ import qualified Cardano.Ledger.Shelley.PParams as ShelleyPP
 import Cardano.Ledger.Shelley.Rules.Delegs
 import Cardano.Ledger.Shelley.Rules.EraMapping ()
 import Cardano.Ledger.Shelley.Rules.Ledger
-import Cardano.Ledger.Shelley.Tx
-import Cardano.Ledger.Shelley.UTxO
 import Cardano.Protocol.TPraos.API
-import Cardano.Protocol.TPraos.API (PraosCrypto)
 import Cardano.Protocol.TPraos.BHeader
 import Cardano.Protocol.TPraos.OCert
 import Cardano.Protocol.TPraos.Rules.Prtcl
@@ -66,18 +61,37 @@ import qualified Data.Set as Set
 import Data.Time
 import Data.Word (Word64, Word8)
 import GHC.Records (HasField)
-import Lens.Micro ((&), (.~))
 import Numeric.Natural (Natural)
 import Test.Cardano.Ledger.Generic.Proof
 import Test.Cardano.Ledger.Shelley.Generator.Core
 import Test.Cardano.Ledger.Shelley.Orphans ()
 import Test.Cardano.Ledger.Shelley.Utils hiding (mkVRFKeyPair)
-
-import Test.Cardano.Ledger.Generic.Updaters(newTx,updateTx,newTxBody)
-import Test.Cardano.Ledger.Generic.Fields(TxField(..),TxBodyField(..),WitnessesField(..)) hiding (Update)
-import qualified Test.Cardano.Ledger.Generic.Fields as Fields (TxBodyField(Update))
+import Test.Cardano.Ledger.Generic.Updaters(newTx,newTxBody,newTxOut,newWitnesses,merge)
+import Test.Cardano.Ledger.Generic.Fields(TxField(..),TxBodyField(..),TxOutField(..),WitnessesField(..))
 import Data.List(foldl')
 import Cardano.Ledger.Val(inject)
+import Cardano.Ledger.Shelley.UTxO(makeWitnessesVKey)
+import Cardano.Ledger.ShelleyMA.AuxiliaryData(MAAuxiliaryData(..))
+import Cardano.Ledger.ShelleyMA( ShelleyMAEra )
+import Cardano.Ledger.ShelleyMA.Timelocks(Timelock(..),ValidityInterval(..))
+import Cardano.Ledger.Allegra.Translation()
+import Cardano.Ledger.Mary.Translation()
+import Cardano.Ledger.Mary.Value(MaryValue(..),PolicyID(..),AssetName(..))
+import Test.Cardano.Ledger.Alonzo.Scripts (alwaysFails, alwaysSucceeds)
+import Test.Cardano.Ledger.Alonzo.PlutusScripts (testingCostModelV1)
+import Cardano.Ledger.Alonzo.Language (Language (PlutusV1))
+import qualified Cardano.Ledger.Alonzo.Scripts as Tag (Tag (..))
+import Cardano.Ledger.Alonzo.Data
+  ( AlonzoAuxiliaryData (..),
+    AuxiliaryDataHash (..),
+    Data (..),
+    hashData,
+  )
+import qualified PlutusTx as Plutus
+import Cardano.Ledger.Alonzo.Scripts (AlonzoScript(..),ExUnits (..),CostModels(..),Prices(..))
+import Cardano.Ledger.Alonzo.TxWitness (RdmrPtr (..), Redeemers (..), TxDats (..))
+import Cardano.Ledger.Alonzo.Genesis (AlonzoGenesis (..))
+import GHC.Stack (HasCallStack)
 
 -- ==================================================================
 
@@ -99,9 +113,9 @@ emptyPP (Alonzo _) = AlonzoPP.emptyPParams
 emptyPP (Babbage _) = BabbagePP.emptyPParams
 emptyPP (Conway _) = ConwayPP.emptyPParams
 
-{-------------------------------------------------------------------------------
-  ShelleyLedgerExamples
--------------------------------------------------------------------------------}
+-- ==================================================================
+-- LedgerExamples
+-- ==================================================================
 
 data ResultExamples era = ResultExamples
   { sreProof :: Proof era,
@@ -130,6 +144,16 @@ data LedgerExamples era = LedgerExamples
 
 -- ============================================================
 
+
+mkWitnesses:: Reflect era =>
+  Proof era ->
+  Core.TxBody era ->
+  KeyPairWits era ->
+  Core.Witnesses era
+mkWitnesses proof txBody keyPairWits =
+  genericWits proof [ Just (AddrWits (makeWitnessesVKey (coerce (hashAnnotated txBody)) keyPairWits)) ]
+
+
 defaultLedgerExamples ::
   forall era.
   ( Reflect era,
@@ -137,17 +161,15 @@ defaultLedgerExamples ::
     Default (State (Core.EraRule "PPUP" era))
   ) =>
   Proof era ->
-  (Core.TxBody era -> KeyPairWits era -> Core.Witnesses era) ->
-  (ShelleyTx era -> Core.Tx era) ->
   Core.Value era ->
   Core.TxBody era ->
   Core.AuxiliaryData era ->
   TranslationContext era ->
   LedgerExamples era
-defaultLedgerExamples proof mkWitnesses mkAlonzoTx value txBody auxData translationContext =
+defaultLedgerExamples proof value txBody auxData translationContext =
   LedgerExamples
     { sleProof = proof,
-      sleBlock = exampleLedgerBlock proof tx, -- (mkAlonzoTx tx),
+      sleBlock = exampleLedgerBlock proof tx,  
       sleHashHeader = exampleHashHeader proof,
       sleTx = tx,
       sleApplyTxError =
@@ -171,13 +193,21 @@ defaultLedgerExamples proof mkWitnesses mkAlonzoTx value txBody auxData translat
         exampleNewEpochState
           proof
           value
-          undefined -- (emptyPP proof)
-          undefined, -- ((emptyPP proof) {_minUTxOValue = Coin 1}),
+          (emptyPP proof)
+          (case proof of
+             Shelley _ -> (emptyPP proof){_minUTxOValue = Coin 1}
+             Allegra _ -> (emptyPP proof){_minUTxOValue = Coin 1}
+             Mary _ -> (emptyPP proof){_minUTxOValue = Coin 1}
+             Alonzo _ -> (emptyPP proof){AlonzoPP._coinsPerUTxOWord = Coin 1}
+             Babbage _ -> (emptyPP proof){BabbagePP._coinsPerUTxOByte = Coin 1}
+             Conway _ -> (emptyPP proof){ConwayPP._coinsPerUTxOByte = Coin 1}           
+             ),
+            
       sleChainDepState = exampleLedgerChainDepState 1,
       sleTranslationContext = translationContext
     }
   where
-    tx = exampleTx proof mkWitnesses txBody auxData
+    tx = exampleTx proof txBody auxData
 
     resultExamples =
       ResultExamples
@@ -213,11 +243,7 @@ mkDummySafeHash _ =
   unsafeMakeSafeHash
     . mkDummyHash (Proxy @(HASH c))
 
-exampleLedgerBlock ::
-  forall era.
-  ( Reflect era
-  -- EraSegWits era
-  ) =>
+exampleLedgerBlock :: forall era. Reflect era =>
   Proof era ->
   Core.Tx era ->
   Block (BHeader (Era.Crypto era)) era
@@ -302,11 +328,11 @@ exampleHashHeader ::
   Reflect era =>
   Proof era ->
   HashHeader (Cardano.Ledger.Era.Crypto era)
-exampleHashHeader proof = coerce $ mkDummyHash (Proxy @(HASH (Cardano.Ledger.Era.Crypto era))) 0
+exampleHashHeader _proof = coerce $ mkDummyHash (Proxy @(HASH (Cardano.Ledger.Era.Crypto era))) 0
 
+-- | Since every Era that has a new Update uses the same name for the fields, we need
+--   to case on the proof, that way we can then use the Era specific _keyDeposit selector.
 exampleProposedPParamsUpdates ::
-  ( Reflect era
-  ) =>
   Proof era ->
   ProposedPPUpdates era
 exampleProposedPParamsUpdates proof@(Shelley _) =
@@ -327,8 +353,8 @@ exampleProposedPParamsUpdates proof@(Mary _) =
 exampleProposedPParamsUpdates proof@(Alonzo _) =
   ProposedPPUpdates $
     Map.singleton
-      (mkKeyHash 1)
-      ((emptyPPUpdate proof) {AlonzoPP._maxBHSize = SJust 4000})
+      (mkKeyHash 0)
+      ((emptyPPUpdate proof) {AlonzoPP._collateralPercentage = SJust 150})
 exampleProposedPParamsUpdates proof@(Babbage _) =
   ProposedPPUpdates $
     Map.singleton
@@ -339,6 +365,7 @@ exampleProposedPParamsUpdates proof@(Conway _) =
     Map.singleton
       (mkKeyHash 1)
       ((emptyPPUpdate proof) {ConwayPP._maxBHSize = SJust 4000})
+
 
 exampleNonMyopicRewards ::
   forall c.
@@ -372,8 +399,7 @@ exampleNewEpochState ::
   forall era.
   ( Reflect era,
     Default (StashedAVVMAddresses era),
-    Default (State (Core.EraRule "PPUP" era)),
-    Core.EraTxOut era
+    Default (State (Core.EraRule "PPUP" era))
   ) =>
   Proof era ->
   Core.Value era ->
@@ -408,7 +434,7 @@ exampleNewEpochState proof value ppp pp =
                         UTxO $
                           Map.fromList
                             [ ( TxIn (TxId (mkDummySafeHash Proxy 1)) minBound,
-                                Core.mkBasicTxOut addr value
+                                genericTxOut proof [Just (Address addr), Just (Amount value)]
                               )
                             ],
                       _deposited = Coin 1000,
@@ -491,21 +517,49 @@ exampleLedgerChainDepState seed =
 
 -- | This is not a valid transaction. We don't care, we are only interested in
 -- serialisation, not validation.
-exampleTx ::
-  forall era.
-  ( Reflect era,
-    Core.EraTx era
-  ) =>
+exampleTx :: forall era. Reflect era =>
   Proof era ->
-  (Core.TxBody era -> KeyPairWits era -> Core.Witnesses era) ->
   Core.TxBody era ->
   Core.AuxiliaryData era ->
   Core.Tx era
-exampleTx proof mkWitnesses txBody auxData =
+exampleTx proof txBody auxData =
   genericTx proof
     [ Just (Body txBody)
-    , Just (Witnesses  (mkWitnesses txBody keyPairWits))
-    , Just (AuxData' [auxData])
+    , case proof of
+        Shelley _ -> Just (Witnesses  (mkWitnesses proof txBody keyPairWits))
+        Allegra _ -> Just (Witnesses  (mkWitnesses proof txBody keyPairWits))
+        Mary    _ -> Just (Witnesses  (mkWitnesses proof txBody keyPairWits))
+        Alonzo _ ->
+          Just (WitnessesI
+            [AddrWits (makeWitnessesVKey (hashAnnotated txBody) [asWitness examplePayKey])
+            ,BootWits mempty
+            ,ScriptWits
+               (Map.singleton (Core.hashScript @era $ alwaysSucceeds PlutusV1 3)
+                              (alwaysSucceeds PlutusV1 3))
+            ,DataWits (TxDats $ Map.singleton
+                          (Cardano.Ledger.Alonzo.Data.hashData @era datumExample)
+                          datumExample)
+            ,RdmrWits (Redeemers @era $
+                         Map.singleton (RdmrPtr Tag.Spend 0)
+                                       (redeemerExample @era, ExUnits 5000 5000))
+            ])
+        _ -> Nothing
+    , case proof of
+         Shelley _ -> Just (AuxData' [auxData])
+         Allegra _ -> Just (AuxData' [auxData])
+         Mary _ -> Just (AuxData' [auxData])
+         Alonzo _ ->
+            Just (AuxData' [ AlonzoAuxiliaryData exampleMetadataMap
+                     ( StrictSeq.fromList
+                         [ alwaysFails PlutusV1 2
+                         , TimelockScript $ RequireAllOf mempty ]) ])  
+         _ -> Nothing
+    , case proof of
+        Shelley _ -> Nothing
+        Allegra _ -> Nothing
+        Mary _ -> Nothing        
+        Alonzo _ -> Just (Valid' True)
+        _ -> Nothing
     ]    
   where
     keyPairWits :: KeyPairWits era
@@ -516,40 +570,39 @@ exampleTx proof mkWitnesses txBody auxData =
       ]
 
 
-exampleTxBody :: Era era => Proof era -> Core.TxBody era
+exampleTxBody :: forall era. Reflect era => Proof era -> Core.TxBody era
 exampleTxBody proof =
    genericTxBody proof
-     [ Just (specialize @Core.EraTxOut proof
-                (Outputs' [ Core.mkBasicTxOut (mkAddr (examplePayKey, exampleStakeKey))
-                                              (inject (Coin 100000)) ]))
+     [ Just (Outputs'
+              [genericTxOut proof
+                 [ Just $ Address (mkAddr (examplePayKey, exampleStakeKey))
+                 , case proof of
+                     Shelley _ -> Just $ Amount (inject (Coin 100000))
+                     Allegra _ -> Just $ Amount exampleCoin
+                     Mary _ ->  Just $ Amount (exampleMultiAssetValue 1)
+                     _ -> Nothing
+                 ]])
      , Just (Certs exampleCerts)
      , Just (Wdrls exampleWithdrawals)
      , Just (Txfee (Coin 3))
-     , if (Some proof) == (Some (Shelley Mock))
-          then Just (TTL (SlotNo 10)) else Nothing
-     , Just (Update' (Update exampleProposedPPUpdates (EpochNo 0)))
+     , case proof of
+        Shelley _ -> Just (TTL (SlotNo 10))
+        Allegra _ -> Just (Vldt (ValidityInterval (SJust (SlotNo 2)) (SJust (SlotNo 4))))
+        Mary _ -> Just (Vldt (ValidityInterval (SJust (SlotNo 2)) (SJust (SlotNo 4))))
+        _ -> Nothing
+     , Just (Update' [Cardano.Ledger.Shelley.PParams.Update (exampleProposedPParamsUpdates proof) (EpochNo 0)])
+     , Just (AdHash' [auxiliaryDataHash])
+     , case proof of
+         Shelley _ -> Nothing
+         Allegra _ -> Just (Mint exampleCoin)
+         Mary _ -> Just (Mint (exampleMultiAssetValue 1))
+         _ -> Nothing
      ]
-
-
-{-
-  ShelleyTxBody
-    exampleTxIns
-    ( StrictSeq.fromList
-        [ ShelleyTxOut ( mkBasicTxOut (mkAddr (examplePayKey, exampleStakeKey)) (Coin 100000))
-        ]
-    )
-    exampleCerts
-    exampleWithdrawals
-    (Coin 3)
-    (SlotNo 10)
-    (SJust (Update exampleProposedPPUpdates (EpochNo 0)))
-    (SJust auxiliaryDataHash)
-  where
+   where
     -- Dummy hash to decouple from the auxiliaryData in 'exampleTx'.
-    auxiliaryDataHash :: AuxiliaryDataHash StandardCrypto
+    auxiliaryDataHash :: AuxiliaryDataHash (Era.Crypto era)
     auxiliaryDataHash =
-      AuxiliaryDataHash $ mkDummySafeHash (Proxy @StandardCrypto) 30
--}
+      AuxiliaryDataHash $ mkDummySafeHash (Proxy @(Era.Crypto era)) 30
 
 
 exampleCerts :: CC.Crypto c => StrictSeq (DCert c)
@@ -592,12 +645,35 @@ exampleWithdrawals =
     Map.fromList
       [ (_poolRAcnt examplePoolParams, Coin 100)
       ]
--- ==========================================
 
-testShelleyGenesis = undefined
+-- | These are dummy values.
+testShelleyGenesis :: ShelleyGenesis era
+testShelleyGenesis =
+  ShelleyGenesis
+    { sgSystemStart = UTCTime (fromGregorian 2020 5 14) 0,
+      sgNetworkMagic = 0,
+      sgNetworkId = Testnet,
+      -- Chosen to match activeSlotCoeff
+      sgActiveSlotsCoeff = unsafeBoundRational 0.9,
+      sgSecurityParam = securityParameter testGlobals,
+      sgEpochLength = runIdentity $ epochInfoSize testEpochInfo 0,
+      sgSlotsPerKESPeriod = slotsPerKESPeriod testGlobals,
+      sgMaxKESEvolutions = maxKESEvo testGlobals,
+      -- Not important
+      sgSlotLength = secondsToNominalDiffTime 2,
+      sgUpdateQuorum = quorum testGlobals,
+      sgMaxLovelaceSupply = maxLovelaceSupply testGlobals,
+      sgProtocolParams = emptyPParams,
+      sgGenDelegs = Map.empty,
+      sgInitialFunds = mempty,
+      sgStaking = emptyGenesisStaking
+    }
 
+testEpochInfo :: EpochInfo Identity
+testEpochInfo = epochInfoPure testGlobals
 
--- | Build a Tx from a list of maybe fields. The maube is usfull because sometimes we
+-- ================================================================================
+-- | Build a Tx from a list of maybe fields. The maybe is usfull because sometimes we
 --   only want to add a field in a particular era, so we might say something like this
 -- genericTx proof
 --  [Just field1
@@ -621,3 +697,139 @@ genericTxBody:: Era era => Proof era -> [Maybe (TxBodyField era)] -> Core.TxBody
 genericTxBody proof xs = specialize @Core.EraTxBody proof (newTxBody proof (foldl' accum [] xs))
   where accum ans Nothing = ans
         accum ans (Just field) = field : ans
+
+genericTxOut:: Era era => Proof era -> [Maybe (TxOutField era)] -> Core.TxOut era
+genericTxOut proof xs = newTxOut proof (foldl' accum [] xs)
+  where accum ans Nothing = ans
+        accum ans (Just field) = field : ans
+
+
+genericWits:: Era era => Proof era -> [Maybe (WitnessesField era)] -> Core.Witnesses era
+genericWits proof xs = newWitnesses merge proof (foldl' accum [] xs)
+  where accum ans Nothing = ans
+        accum ans (Just field) = field : ans
+
+
+
+-- =========================================================
+-- Individual examples for each Era
+-- =========================================================
+
+type StandardShelley = ShelleyEra StandardCrypto
+
+-- | ShelleyLedgerExamples for Shelley era
+ledgerExamplesShelley :: LedgerExamples StandardShelley
+ledgerExamplesShelley =
+  defaultLedgerExamples
+    (Shelley Standard)
+    exampleCoin
+    (exampleTxBody (Shelley Standard))
+    exampleAuxiliaryDataShelley
+    ()
+
+exampleCoin :: Coin
+exampleCoin = Coin 10
+
+exampleMetadataMap :: Map Word64 Metadatum
+exampleMetadataMap =
+  Map.fromList
+    [ (1, S "string"),
+      (2, B "bytes"),
+      (3, List [I 1, I 2]),
+      (4, Map [(I 3, B "b")])
+    ]
+
+exampleAuxiliaryDataShelley :: Core.AuxiliaryData StandardShelley
+exampleAuxiliaryDataShelley = Metadata exampleMetadataMap
+
+-- ======================
+
+type StandardAllegra = AllegraEra StandardCrypto
+
+ledgerExamplesAllegra :: LedgerExamples StandardAllegra
+ledgerExamplesAllegra =
+  defaultLedgerExamples
+    (Allegra Standard)
+    exampleCoin
+    (exampleTxBody (Allegra Standard))
+    exampleAuxiliaryDataMA
+    ()
+
+exampleAuxiliaryDataMA :: CC.Crypto c => MAAuxiliaryData (ShelleyMAEra ma c)
+exampleAuxiliaryDataMA =
+  MAAuxiliaryData
+    exampleMetadataMap
+    (StrictSeq.fromList [exampleScriptMA])
+
+exampleScriptMA :: CC.Crypto c => Core.Script (ShelleyMAEra ma c)
+exampleScriptMA =
+  RequireMOf 2 $
+    StrictSeq.fromList
+      [ RequireAllOf $
+          StrictSeq.fromList
+            [ RequireTimeStart (SlotNo 0),
+              RequireTimeExpire (SlotNo 9)
+            ],
+        RequireAnyOf $
+          StrictSeq.fromList
+            [ RequireSignature (mkKeyHash 0),
+              RequireSignature (mkKeyHash 1)
+            ],
+        RequireSignature (mkKeyHash 100)
+      ]
+
+-- ==============================================
+
+type StandardMary = MaryEra CC.StandardCrypto
+
+ledgerExamplesMary :: LedgerExamples StandardMary
+ledgerExamplesMary =
+  defaultLedgerExamples
+    (Mary Standard)
+    (exampleMultiAssetValue 1)
+    (exampleTxBody (Mary Standard))
+    exampleAuxiliaryDataMA
+    ()
+
+exampleMultiAssetValue ::
+  forall c.
+  CC.Crypto c =>
+  Int ->
+  MaryValue c
+exampleMultiAssetValue x =
+  MaryValue 100 $ Map.singleton policyId $ Map.singleton couttsCoin 1000
+  where
+    policyId :: PolicyID c
+    policyId = PolicyID $ mkScriptHash x
+
+    couttsCoin :: AssetName
+    couttsCoin = AssetName "couttsCoin"
+
+-- ============================================================
+
+
+type StandardAlonzo = AlonzoEra StandardCrypto
+
+-- datumExample :: Data StandardAlonzo
+datumExample = Data (Plutus.I 191)
+
+redeemerExample :: Data era
+redeemerExample = Data (Plutus.I 919)
+
+exampleAlonzoGenesis :: AlonzoGenesis
+exampleAlonzoGenesis =
+  AlonzoGenesis
+    { coinsPerUTxOWord = Coin 1,
+      costmdls = CostModels $ Map.fromList [(PlutusV1, testingCostModelV1)],
+      prices = Prices (boundRational' 90) (boundRational' 91),
+      maxTxExUnits = ExUnits 123 123,
+      maxBlockExUnits = ExUnits 223 223,
+      maxValSize = 1234,
+      collateralPercentage = 20,
+      maxCollateralInputs = 30
+    }
+  where
+    boundRational' :: HasCallStack => Rational -> NonNegativeInterval
+    boundRational' x = case boundRational x of
+      Nothing -> error $ "Expected non-negative value but got: " <> show x
+      Just x' -> x'
