@@ -61,9 +61,10 @@ import Cardano.Ledger.Shelley.TxBody
     addrEitherShelleyTxOutL,
     valueEitherShelleyTxOutL,
   )
-import Cardano.Ledger.ShelleyMA.Era (MAClass (getScriptHash), ShelleyMAEra)
+import Cardano.Ledger.ShelleyMA.Era (MAClass (getScriptHash), ShelleyMAEra, MaryOrAllegra(..))
 import Cardano.Ledger.ShelleyMA.Timelocks (ValidityInterval (..))
 import Cardano.Ledger.TxIn (TxIn (..))
+import Cardano.Ledger.Crypto (StandardCrypto)
 import Cardano.Ledger.Val
   ( DecodeMint (..),
     EncodeMint (..),
@@ -292,38 +293,53 @@ lensTxBodyRaw getter setter =
     (\(TxBodyConstr (Memo txBodyRaw _)) val -> mkMATxBody $ setter txBodyRaw val)
 
 instance MAClass ma crypto => EraTxBody (ShelleyMAEra ma crypto) where
+  {-# SPECIALIZE instance EraTxBody (ShelleyMAEra 'Mary StandardCrypto) #-}
+  {-# SPECIALIZE instance EraTxBody (ShelleyMAEra 'Allegra StandardCrypto) #-}
   type TxBody (ShelleyMAEra ma crypto) = MATxBody (ShelleyMAEra ma crypto)
 
   mkBasicTxBody = mkMATxBody initial
 
   inputsTxBodyL =
     lensTxBodyRaw inputs (\txBodyRaw inputs_ -> txBodyRaw {inputs = inputs_})
+  {-# INLINE inputsTxBodyL #-}
 
   outputsTxBodyL =
     lensTxBodyRaw outputs (\txBodyRaw outputs_ -> txBodyRaw {outputs = outputs_})
+  {-# INLINE outputsTxBodyL #-}
 
   feeTxBodyL =
     lensTxBodyRaw txfee (\txBodyRaw fee_ -> txBodyRaw {txfee = fee_})
+  {-# INLINE feeTxBodyL #-}
 
   auxDataHashTxBodyL =
     lensTxBodyRaw adHash (\txBodyRaw auxDataHash -> txBodyRaw {adHash = auxDataHash})
+  {-# INLINE auxDataHashTxBodyL #-}
 
   allInputsTxBodyF = inputsTxBodyL
+  {-# INLINE allInputsTxBodyF #-}
 
   mintedTxBodyF =
     to (\(TxBodyConstr (Memo txBodyRaw _)) -> getScriptHash (Proxy @ma) (mint txBodyRaw))
+  {-# INLINE mintedTxBodyF #-}
 
 instance MAClass ma crypto => ShelleyEraTxBody (ShelleyMAEra ma crypto) where
+  {-# SPECIALIZE instance ShelleyEraTxBody (ShelleyMAEra 'Mary StandardCrypto) #-}
+  {-# SPECIALIZE instance ShelleyEraTxBody (ShelleyMAEra 'Allegra StandardCrypto) #-}
+
   wdrlsTxBodyL =
     lensTxBodyRaw wdrls (\txBodyRaw wdrls_ -> txBodyRaw {wdrls = wdrls_})
+  {-# INLINE wdrlsTxBodyL #-}
 
   ttlTxBodyL = notSupportedInThisEraL
+  {-# INLINE ttlTxBodyL #-}
 
   updateTxBodyL =
     lensTxBodyRaw update (\txBodyRaw update_ -> txBodyRaw {update = update_})
+  {-# INLINE updateTxBodyL #-}
 
   certsTxBodyL =
     lensTxBodyRaw certs (\txBodyRaw certs_ -> txBodyRaw {certs = certs_})
+  {-# INLINE certsTxBodyL #-}
 
 class
   (ShelleyEraTxBody era, EncodeMint (Value era), DecodeMint (Value era)) =>
@@ -334,15 +350,25 @@ class
   mintTxBodyL :: Lens' (Core.TxBody era) (Value era)
 
 instance MAClass ma crypto => ShelleyMAEraTxBody (ShelleyMAEra ma crypto) where
+  {-# SPECIALIZE instance ShelleyMAEraTxBody (ShelleyMAEra 'Mary StandardCrypto) #-}
+  {-# SPECIALIZE instance ShelleyMAEraTxBody (ShelleyMAEra 'Allegra StandardCrypto) #-}
   vldtTxBodyL =
     lensTxBodyRaw vldt (\txBodyRaw vldt_ -> txBodyRaw {vldt = vldt_})
+  {-# INLINE vldtTxBodyL #-}
 
   mintTxBodyL =
     lensTxBodyRaw mint (\txBodyRaw mint_ -> txBodyRaw {mint = mint_})
+  {-# INLINE mintTxBodyL #-}
 
 instance MAClass ma crypto => EraTxOut (ShelleyMAEra ma crypto) where
+  {-# SPECIALIZE instance EraTxOut (ShelleyMAEra 'Mary StandardCrypto) #-}
+  {-# SPECIALIZE instance EraTxOut (ShelleyMAEra 'Allegra StandardCrypto) #-}
   type TxOut (ShelleyMAEra ma crypto) = ShelleyTxOut (ShelleyMAEra ma crypto)
 
   mkBasicTxOut = ShelleyTxOut
+
   addrEitherTxOutL = addrEitherShelleyTxOutL
+  {-# INLINE addrEitherTxOutL #-}
+
   valueEitherTxOutL = valueEitherShelleyTxOutL
+  {-# INLINE valueEitherTxOutL #-}

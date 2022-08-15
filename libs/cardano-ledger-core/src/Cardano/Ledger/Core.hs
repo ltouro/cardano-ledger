@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-
 -- | This module defines core type families which we know to vary from era to
 -- era.
 --
@@ -214,6 +213,7 @@ class
           Right cValue -> fromCompact cValue
       )
       (\txOut value -> txOut & valueEitherTxOutL .~ Left value)
+  {-# INLINE valueTxOutL #-}
 
   compactValueTxOutL :: Lens' (TxOut era) (CompactForm (Value era))
   compactValueTxOutL =
@@ -223,6 +223,7 @@ class
           Right cValue -> cValue
       )
       (\txOut cValue -> txOut & valueEitherTxOutL .~ Right cValue)
+  {-# INLINE compactValueTxOutL #-}
 
   -- | Lens for getting and setting in TxOut either an address or its compact
   -- version by doing the least amount of work.
@@ -236,6 +237,7 @@ class
           Right cAddr -> decompactAddr cAddr
       )
       (\txOut addr -> txOut & addrEitherTxOutL .~ Left addr)
+  {-# INLINE addrTxOutL #-}
 
   compactAddrTxOutL :: Lens' (TxOut era) (CompactAddr (Crypto era))
   compactAddrTxOutL =
@@ -245,6 +247,7 @@ class
           Right cAddr -> cAddr
       )
       (\txOut cAddr -> txOut & addrEitherTxOutL .~ Right cAddr)
+  {-# INLINE compactAddrTxOutL #-}
 
   -- | Lens for getting and setting in TxOut either an address or its compact
   -- version by doing the least amount of work.
@@ -281,6 +284,7 @@ coinTxOutL =
           Right cVal ->
             txOut & compactValueTxOutL .~ modifyCompactCoin (const (toCompactPartial c)) cVal
     )
+{-# INLINE coinTxOutL #-}
 
 toCompactPartial :: (Val a, Show a) => a -> CompactForm a
 toCompactPartial v =
