@@ -16,7 +16,6 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Roundtrip
   ( roundTrip,
     roundTripAnn,
-    roundTripAnnWithTwiddling, roundTripWithTwiddling
   )
 import Data.Typeable (typeRep)
 import Test.Cardano.Ledger.EraBuffet
@@ -26,6 +25,7 @@ import Test.Cardano.Ledger.ShelleyMA.Serialisation.Generators ()
 import Test.QuickCheck (Arbitrary, Property, counterexample, (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
+import Data.Twiddle (unTwiddle, Twiddle)
 
 propertyAnn ::
   forall t.
@@ -87,11 +87,6 @@ allprops =
       testProperty "Value" $ property @(Core.Value e),
       testProperty "Script" $ propertyAnn @(Core.Script e),
       testProperty "ApplyTxError" $ property @(ApplyTxError e),
-      testProperty "TxBody with twiddling" $ roundTripAnnWithTwiddling @(Core.TxBody e),
-      testProperty "Metadata with twiddling" $ roundTripAnnWithTwiddling @(Core.AuxiliaryData e),
-      testProperty "Value with twiddling" $ roundTripWithTwiddling @(Core.Value e),
-      testProperty "Script with twiddling" $ roundTripAnnWithTwiddling @(Core.Script e),
-      testProperty "ApplyTxError with twiddling" $ roundTripWithTwiddling @(ApplyTxError e)
     ]
 
 allEraRoundtripTests :: TestTree
