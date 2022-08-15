@@ -73,8 +73,8 @@ import Cardano.Ledger.Serialization (Sized (..))
 import qualified Cardano.Ledger.Shelley.LedgerState as Shelley
 import Cardano.Ledger.Shelley.Rules.Utxo (ShelleyUtxoEnv, ShelleyUtxoPredFailure)
 import qualified Cardano.Ledger.Shelley.Rules.Utxo as Shelley
-import Cardano.Ledger.ShelleyMA.Rules (ShelleyMAUtxoPredFailure)
 import Cardano.Ledger.Shelley.UTxO (UTxO (..), areAllAdaOnly, balance)
+import Cardano.Ledger.ShelleyMA.Rules (ShelleyMAUtxoPredFailure)
 import qualified Cardano.Ledger.ShelleyMA.Rules as ShelleyMA
   ( validateOutsideValidityIntervalUTxO,
     validateTriesToForgeADA,

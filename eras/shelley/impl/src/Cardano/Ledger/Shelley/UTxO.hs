@@ -1,5 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -377,7 +376,8 @@ coinConsumed ::
 coinConsumed pp (UTxO u) txBody =
   {- balance (txins tx ◁ u) + wbalance (txwdrls tx) + keyRefunds pp tx -}
   coinBalance (UTxO (Map.restrictKeys u (txBody ^. inputsTxBodyL)))
-    <> refunds <> withdrawals
+    <> refunds
+    <> withdrawals
   where
     refunds = keyRefunds pp txBody
     withdrawals = fold . unWdrl $ txBody ^. wdrlsTxBodyL

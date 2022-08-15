@@ -50,6 +50,7 @@ import Cardano.Ledger.BaseTypes (StrictMaybe (SJust, SNothing))
 import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Core hiding (TxBody)
 import qualified Cardano.Ledger.Core as Core
+import Cardano.Ledger.Crypto (StandardCrypto)
 import Cardano.Ledger.SafeHash (HashAnnotated, SafeToHash)
 import Cardano.Ledger.Serialization (encodeFoldable)
 import Cardano.Ledger.Shelley.PParams (Update)
@@ -61,10 +62,9 @@ import Cardano.Ledger.Shelley.TxBody
     addrEitherShelleyTxOutL,
     valueEitherShelleyTxOutL,
   )
-import Cardano.Ledger.ShelleyMA.Era (MAClass (getScriptHash), ShelleyMAEra, MaryOrAllegra(..))
+import Cardano.Ledger.ShelleyMA.Era (MAClass (getScriptHash), MaryOrAllegra (..), ShelleyMAEra)
 import Cardano.Ledger.ShelleyMA.Timelocks (ValidityInterval (..))
 import Cardano.Ledger.TxIn (TxIn (..))
-import Cardano.Ledger.Crypto (StandardCrypto)
 import Cardano.Ledger.Val
   ( DecodeMint (..),
     EncodeMint (..),
