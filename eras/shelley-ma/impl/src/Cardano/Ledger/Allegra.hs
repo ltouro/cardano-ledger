@@ -72,7 +72,7 @@ type Value era = Coin
 
 {-# DEPRECATED Value "Use `Coin` instead" #-}
 
-type TxWits era = ShelleyWitnesses (Crypto era)
+type TxWits era = ShelleyEraTxWits (Crypto era)
 
 {-# DEPRECATED TxWits "Use `Timelock` instead" #-}
 

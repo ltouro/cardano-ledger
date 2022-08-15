@@ -17,7 +17,7 @@ import Cardano.Ledger.Core (Era (Crypto), EraTx (..), EraTxWits (..), PhasedScri
 import Cardano.Ledger.Keys.WitVKey (witVKeyHash)
 import Cardano.Ledger.Shelley.Tx
   ( ShelleyTx,
-    ShelleyWitnesses,
+    ShelleyEraTxWits,
     addrShelleyWitsL,
     auxDataShelleyTxL,
     bodyShelleyTxL,
@@ -63,7 +63,7 @@ validateTimelock timelock tx = evalTimelock vhks (tx ^. bodyTxL . vldtTxBodyL) t
     vhks = Set.map witVKeyHash (tx ^. witsTxL . addrWitsL)
 
 instance MAClass ma crypto => EraTxWits (ShelleyMAEra ma crypto) where
-  type TxWits (ShelleyMAEra ma crypto) = ShelleyWitnesses (ShelleyMAEra ma crypto)
+  type TxWits (ShelleyMAEra ma crypto) = ShelleyEraTxWits (ShelleyMAEra ma crypto)
 
   mkBasicWits = mempty
 

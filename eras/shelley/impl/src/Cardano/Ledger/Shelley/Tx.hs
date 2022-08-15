@@ -36,10 +36,10 @@ module Cardano.Ledger.Shelley.Tx
     segwitTx,
 
     -- * TxWits
-    ShelleyWitnesses,
+    ShelleyEraTxWits,
     WitnessSet,
     WitnessSetHKD
-      ( ShelleyWitnesses,
+      ( ShelleyEraTxWits,
         WitnessSet,
         addrWits,
         bootWits,
@@ -330,28 +330,28 @@ deriving via
 
 type WitnessSet = WitnessSetHKD Identity
 
-type ShelleyWitnesses = WitnessSetHKD Identity
+type ShelleyEraTxWits = WitnessSetHKD Identity
 
--- | Script witness setter and getter for `ShelleyWitnesses`. The
+-- | Script witness setter and getter for `ShelleyEraTxWits`. The
 -- setter does update memoized binary representation.
 scriptShelleyWitsL ::
-  EraTxWits era => Lens' (ShelleyWitnesses era) (Map (ScriptHash (Crypto era)) (Script era))
+  EraTxWits era => Lens' (ShelleyEraTxWits era) (Map (ScriptHash (Crypto era)) (Script era))
 scriptShelleyWitsL = lens scriptWits' (\w s -> w {scriptWits = s})
 
--- | Addresses witness setter and getter for `ShelleyWitnesses`. The
+-- | Addresses witness setter and getter for `ShelleyEraTxWits`. The
 -- setter does update memoized binary representation.
 addrShelleyWitsL ::
-  EraTxWits era => Lens' (ShelleyWitnesses era) (Set (WitVKey 'Witness (Crypto era)))
+  EraTxWits era => Lens' (ShelleyEraTxWits era) (Set (WitVKey 'Witness (Crypto era)))
 addrShelleyWitsL = lens addrWits' (\w s -> w {addrWits = s})
 
--- | Bootstrap Addresses witness setter and getter for `ShelleyWitnesses`. The
+-- | Bootstrap Addresses witness setter and getter for `ShelleyEraTxWits`. The
 -- setter does update memoized binary representation.
 bootAddrShelleyWitsL ::
-  EraTxWits era => Lens' (ShelleyWitnesses era) (Set (BootstrapWitness (Crypto era)))
+  EraTxWits era => Lens' (ShelleyEraTxWits era) (Set (BootstrapWitness (Crypto era)))
 bootAddrShelleyWitsL = lens bootWits' (\w s -> w {bootWits = s})
 
 instance CC.Crypto crypto => EraTxWits (ShelleyEra crypto) where
-  type TxWits (ShelleyEra crypto) = ShelleyWitnesses (ShelleyEra crypto)
+  type TxWits (ShelleyEra crypto) = ShelleyEraTxWits (ShelleyEra crypto)
 
   mkBasicWits = mempty
 
@@ -373,16 +373,16 @@ instance EraScript era => Semigroup (WitnessSetHKD Identity era) where
 instance EraScript era => Monoid (WitnessSetHKD Identity era) where
   mempty = WitnessSet mempty mempty mempty
 
-pattern ShelleyWitnesses ::
+pattern ShelleyEraTxWits ::
   EraScript era =>
   Set (WitVKey 'Witness (Crypto era)) ->
   Map (ScriptHash (Crypto era)) (Script era) ->
   Set (BootstrapWitness (Crypto era)) ->
   WitnessSet era
-pattern ShelleyWitnesses {addrWits, scriptWits, bootWits} <-
+pattern ShelleyEraTxWits {addrWits, scriptWits, bootWits} <-
   WitnessSet' addrWits scriptWits bootWits _
   where
-    ShelleyWitnesses awits scriptWitMap bootstrapWits =
+    ShelleyEraTxWits awits scriptWitMap bootstrapWits =
       let encodeMapElement ix enc x =
             if null x then Nothing else Just (encodeWord ix <> enc x)
           l =
@@ -400,7 +400,7 @@ pattern ShelleyWitnesses {addrWits, scriptWits, bootWits} <-
               txWitsBytes = witsBytes
             }
 
-{-# COMPLETE ShelleyWitnesses #-}
+{-# COMPLETE ShelleyEraTxWits #-}
 
 pattern WitnessSet ::
   EraScript era =>
@@ -408,7 +408,7 @@ pattern WitnessSet ::
   Map (ScriptHash (Crypto era)) (Script era) ->
   Set (BootstrapWitness (Crypto era)) ->
   WitnessSet era
-pattern WitnessSet a s b = ShelleyWitnesses a s b
+pattern WitnessSet a s b = ShelleyEraTxWits a s b
 
 {-# COMPLETE WitnessSet #-}
 

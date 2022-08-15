@@ -742,10 +742,10 @@ instance
     EraScript era,
     Arbitrary (Core.Script era)
   ) =>
-  Arbitrary (ShelleyWitnesses era)
+  Arbitrary (ShelleyEraTxWits era)
   where
   arbitrary =
-    ShelleyWitnesses
+    ShelleyEraTxWits
       <$> arbitrary
       <*> (mscriptsToWits <$> arbitrary)
       <*> arbitrary

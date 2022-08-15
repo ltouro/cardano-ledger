@@ -105,7 +105,7 @@ import Cardano.Ledger.Shelley.PoolRank
 import Cardano.Ledger.Shelley.RewardProvenance (RewardProvenance)
 import Cardano.Ledger.Shelley.Rewards (StakeShare (..))
 import Cardano.Ledger.Shelley.Rules.NewEpoch (calculatePoolDistr)
-import Cardano.Ledger.Shelley.Tx (ShelleyTx (..), ShelleyWitnesses, WitnessSetHKD (..))
+import Cardano.Ledger.Shelley.Tx (ShelleyTx (..), ShelleyEraTxWits, WitnessSetHKD (..))
 import Cardano.Ledger.Shelley.TxBody (PoolParams (..), ShelleyEraTxBody, WitVKey (..))
 import Cardano.Ledger.Shelley.UTxO (UTxO (..))
 import Cardano.Ledger.Slot (epochInfoSize)
@@ -535,7 +535,7 @@ evaluateTransactionBalance pp u isNewPool txb =
 --------------------------------------------------------------------------------
 
 addShelleyKeyWitnesses ::
-  (EraTx era, TxWits era ~ ShelleyWitnesses era) =>
+  (EraTx era, TxWits era ~ ShelleyEraTxWits era) =>
   ShelleyTx era ->
   Set (WitVKey 'Witness (Crypto era)) ->
   ShelleyTx era

@@ -67,7 +67,7 @@ import Cardano.Ledger.Shelley.Tx
   ( ShelleyTx (..),
     ShelleyTxBody (..),
     ShelleyTxOut (..),
-    ShelleyWitnesses,
+    ShelleyEraTxWits,
     TxIn (..),
     WitnessSetHKD (..),
     _ttl,
@@ -576,7 +576,7 @@ testInvalidWintess =
           SNothing
           SNothing
       txb' = txb {_ttl = SlotNo 2}
-      txwits :: Cardano.Ledger.Shelley.Tx.ShelleyWitnesses C
+      txwits :: Cardano.Ledger.Shelley.Tx.ShelleyEraTxWits C
       txwits = mempty {addrWits = makeWitnessesVKey (hashAnnotated txb') [alicePay]}
       tx = ShelleyTx @C txb txwits SNothing
       errs =
@@ -602,7 +602,7 @@ testWithdrawalNoWit =
           (SlotNo 0)
           SNothing
           SNothing
-      txwits :: ShelleyWitnesses C
+      txwits :: ShelleyEraTxWits C
       txwits = mempty {addrWits = Set.singleton $ makeWitnessVKey (hashAnnotated txb) alicePay}
       tx = ShelleyTx @C txb txwits SNothing
       missing = Set.singleton (asWitness $ hashKey $ vKey bobStake)

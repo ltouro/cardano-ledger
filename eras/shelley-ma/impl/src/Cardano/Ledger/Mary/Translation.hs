@@ -154,8 +154,8 @@ instance Crypto c => TranslateEra (MaryEra c) UTxO where
   translateEra ctxt utxo =
     return $ UTxO (translateEra' ctxt <$> unUTxO utxo)
 
-instance Crypto c => TranslateEra (MaryEra c) ShelleyWitnesses where
-  type TranslationError (MaryEra c) ShelleyWitnesses = DecoderError
+instance Crypto c => TranslateEra (MaryEra c) ShelleyEraTxWits where
+  type TranslationError (MaryEra c) ShelleyEraTxWits = DecoderError
   translateEra _ctx ws =
     case decodeAnnotator "witnessSet" decodeWits (serialize ws) of
       Right new -> pure new
