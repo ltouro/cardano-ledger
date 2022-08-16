@@ -50,7 +50,7 @@ import Cardano.Ledger.BaseTypes (StrictMaybe (SJust, SNothing))
 import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Core hiding (TxBody)
 import qualified Cardano.Ledger.Core as Core
-import Cardano.Ledger.MemoBytes (Mem, MemoBytes (..), memoBytes, MemoHashIndex)
+import Cardano.Ledger.MemoBytes (Mem, MemoBytes (..), MemoHashIndex, memoBytes)
 import Cardano.Ledger.SafeHash (HashAnnotated (..), SafeToHash)
 import Cardano.Ledger.Serialization (encodeFoldable)
 import Cardano.Ledger.Shelley.PParams (Update)
@@ -217,7 +217,7 @@ deriving via
 type instance MemoHashIndex TxBodyRaw = EraIndependentTxBody
 
 instance (c ~ Crypto era, Era era) => HashAnnotated (MATxBody era) EraIndependentTxBody c where
-  hashAnnotated (TxBodyConstr mb) = memoHash mb
+  hashAnnotated (TxBodyConstr mb) = mbHash mb
 
 -- Make a Pattern so the newtype and the MemoBytes are hidden
 

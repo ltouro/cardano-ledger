@@ -84,7 +84,7 @@ import Cardano.Ledger.Credential (Credential (..), Ptr (..))
 import qualified Cardano.Ledger.Crypto as CC
 import Cardano.Ledger.Keys (KeyHash (..), KeyRole (..))
 import Cardano.Ledger.Keys.WitVKey
-import Cardano.Ledger.MemoBytes (Mem, MemoBytes (..), memoBytes, pattern Memo, MemoHashIndex)
+import Cardano.Ledger.MemoBytes (Mem, MemoBytes (..), MemoHashIndex, memoBytes, pattern Memo)
 import Cardano.Ledger.SafeHash (HashAnnotated (..), SafeToHash)
 import Cardano.Ledger.Serialization
   ( decodeRecordNamed,
@@ -453,8 +453,9 @@ type instance MemoHashIndex TxBodyRaw = EraIndependentTxBody
 
 instance
   (EraTxBody era, crypto ~ Crypto era) =>
-  HashAnnotated (ShelleyTxBody era) EraIndependentTxBody crypto where
-    hashAnnotated (TxBodyConstr mb) = memoHash mb
+  HashAnnotated (ShelleyTxBody era) EraIndependentTxBody crypto
+  where
+  hashAnnotated (TxBodyConstr mb) = mbHash mb
 
 instance EraTxBody era => ToCBOR (TxBody era) where
   toCBOR (TxBodyConstr memo) = toCBOR memo

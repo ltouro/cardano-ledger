@@ -171,7 +171,7 @@ import Cardano.Ledger.Credential (Credential (..), StakeReference (..))
 import qualified Cardano.Ledger.Crypto as CC
 import Cardano.Ledger.Keys (KeyHash (..), KeyRole (..))
 import Cardano.Ledger.Mary.Value (MaryValue (..), policies, policyID)
-import Cardano.Ledger.MemoBytes (Mem, MemoBytes (..), memoBytes, MemoHashIndex)
+import Cardano.Ledger.MemoBytes (Mem, MemoBytes (..), MemoHashIndex, memoBytes)
 import Cardano.Ledger.SafeHash
   ( HashAnnotated (..),
     SafeHash,
@@ -838,7 +838,7 @@ mkBabbageTxBody :: BabbageEraTxBody era => BabbageTxBody era
 mkBabbageTxBody = mkBabbageTxBodyFromRaw initialTxBodyRaw
 
 instance (c ~ Crypto era) => HashAnnotated (BabbageTxBody era) EraIndependentTxBody c where
-  hashAnnotated (TxBodyConstr mb) = memoHash mb
+  hashAnnotated (TxBodyConstr mb) = mbHash mb
 
 -- ==============================================================================
 -- We define these accessor functions manually, because if we define them using
