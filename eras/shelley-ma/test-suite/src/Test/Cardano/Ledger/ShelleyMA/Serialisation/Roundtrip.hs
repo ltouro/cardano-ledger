@@ -25,7 +25,6 @@ import Test.Cardano.Ledger.ShelleyMA.Serialisation.Generators ()
 import Test.QuickCheck (Arbitrary, Property, counterexample, (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
-import Data.Twiddle (unTwiddle, Twiddle)
 
 propertyAnn ::
   forall t.

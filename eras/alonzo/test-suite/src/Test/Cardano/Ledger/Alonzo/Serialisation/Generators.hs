@@ -80,7 +80,10 @@ instance
   ) =>
   Arbitrary (AlonzoAuxiliaryData era)
   where
-  arbitrary = AlonzoAuxiliaryData <$> arbitrary <*> arbitrary
+  arbitrary = frequency 
+    [ (9, AlonzoAuxiliaryData <$> arbitrary <*> arbitrary)
+    , (1, pure $ AlonzoAuxiliaryData mempty mempty)
+    ]
 
 instance Arbitrary Tag where
   arbitrary = elements [Spend, Mint, Cert, Rewrd]

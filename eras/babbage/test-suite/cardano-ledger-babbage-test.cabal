@@ -42,7 +42,8 @@ library
 
   exposed-modules:
     Test.Cardano.Ledger.Babbage.Examples.Consensus,
-    Test.Cardano.Ledger.Babbage.Serialisation.Generators
+    Test.Cardano.Ledger.Babbage.Serialisation.Generators,
+    Test.Cardano.Ledger.Babbage.Serialisation.Twiddle
   build-depends:
     bytestring,
     cardano-binary,

@@ -1,13 +1,13 @@
+{-# LANGUAGE ConstrainedClassMethods #-}
 module Data.Twiddle
-  ( Twiddle,
-    unTwiddle,
+  ( Twiddler,
+    Twiddle(..),
+    unTwiddler,
   )
 where
 
 import Cardano.Binary (Encoding, ToCBOR (..))
-import Codec.CBOR.Read (deserialiseFromBytes)
-import Codec.CBOR.Term (Term (..), decodeTerm, encodeTerm)
-import Codec.CBOR.Write (toLazyByteString)
+import Codec.CBOR.Term (Term (..), encodeTerm)
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (fromStrict)
 import qualified Data.ByteString.Lazy as LBS
@@ -16,25 +16,29 @@ import qualified Data.Text.Lazy as T
 import Data.Typeable (Typeable)
 import Test.QuickCheck (Arbitrary (..), Gen, elements, shuffle)
 
-data Twiddle a = Twiddle !a !Encoding
+data Twiddler a = Twiddler !a !Encoding
 
-instance (Arbitrary a, ToCBOR a) => Arbitrary (Twiddle a) where
+class Twiddle a where
+  twiddle :: ToCBOR a => a -> Gen Term
+
+instance (Twiddle a, Arbitrary a, ToCBOR a) => Arbitrary (Twiddler a) where
   arbitrary = do
     x <- arbitrary
-    enc' <- twiddleEncoding $ toCBOR x
-    pure $ Twiddle x enc'
+    enc' <- twiddle x
+    enc'' <- twiddleTerm enc'
+    pure . Twiddler x $ encodeTerm enc''
 
-instance Typeable a => ToCBOR (Twiddle a) where
-  toCBOR (Twiddle _ x) = x
+instance Typeable a => ToCBOR (Twiddler a) where
+  toCBOR (Twiddler _ x) = x
 
-instance Show a => Show (Twiddle a) where
-  show (Twiddle x _) = "Twiddle " <> show x
+instance Show a => Show (Twiddler a) where
+  show (Twiddler x _) = "Twiddler " <> show x
 
-instance Eq a => Eq (Twiddle a) where
-  (Twiddle x _) == (Twiddle y _) = x == y
+instance Eq a => Eq (Twiddler a) where
+  (Twiddler x _) == (Twiddler y _) = x == y
 
-unTwiddle :: Twiddle a -> a
-unTwiddle (Twiddle x _) = x
+unTwiddler :: Twiddler a -> a
+unTwiddler (Twiddler x _) = x
 
 -- | Randomly mutates a CBOR AST so that semantics are preserved.
 --
@@ -56,12 +60,12 @@ twiddleTerm (TMapI x0) = twiddleMap x0
 twiddleTerm (TTagged wo te) = TTagged wo <$> twiddleTerm te
 twiddleTerm t = pure t
 
-twiddleEncoding :: Encoding -> Gen Encoding
-twiddleEncoding enc = encodeTerm <$> twiddleTerm term
-  where
-    term = case deserialiseFromBytes decodeTerm $ toLazyByteString enc of
-      Left err -> error $ "Failed to deserialize: " <> show err
-      Right (_, x) -> x
+--twiddleEncoding :: Encoding -> Gen Encoding
+--twiddleEncoding enc = encodeTerm <$> twiddleTerm term
+--  where
+--    term = case deserialiseFromBytes decodeTerm $ toLazyByteString enc of
+--      Left err -> error $ "Failed to deserialize: " <> show err
+--      Right (_, x) -> x
 
 twiddleList :: [Term] -> Gen Term
 twiddleList l = do
